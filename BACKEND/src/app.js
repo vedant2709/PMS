@@ -9,12 +9,29 @@ import { errorHandler } from "./middlewares/errorHandler.js";
 
 const app = express();
 
+const allowedOrigins = [
+  "https://pms-frontend.vercel.app",
+];
+
 app.use(
   cors({
-    origin: "https://pms-q5nx0pv35-vedant2709s-projects.vercel.app/", // your frontend URL
-    credentials: true, // allow cookies
+    origin: (origin, callback) => {
+      const vercelPreviewRegex = /^https:\/\/pms-[a-z0-9]+-[a-z0-9\-]+\.vercel\.app$/;
+
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        vercelPreviewRegex.test(origin)
+      ) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS: " + origin));
+      }
+    },
+    credentials: true,
   })
 );
+
 app.use(cookieParser());
 
 // Middleware
