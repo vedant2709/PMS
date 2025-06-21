@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const taskAPI = axios.create({
-  baseURL: "https://pms-3vhoncykv-vedant2709s-projects.vercel.app/api/task",
+  baseURL: "https://pms-frontend-6ciz.onrender.com/api/task",
   withCredentials: true,
 });
 

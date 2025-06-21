@@ -11,7 +11,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: "https://pms-6abtnrk2g-vedant2709s-projects.vercel.app/", // your frontend URL
+    origin: "https://pms-frontend-6ciz.onrender.com/", // your frontend URL
     credentials: true, // allow cookies
   })
 );
