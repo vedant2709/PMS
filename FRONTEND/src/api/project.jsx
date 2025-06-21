@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const projectAPI = axios.create({
-  baseURL: "https://pms-frontend-6ciz.onrender.com/api/projects",
+  baseURL: "https://pms-3vhoncykv-vedant2709s-projects.vercel.app/api/projects",
   withCredentials: true,
 });
 

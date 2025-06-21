@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const adminAPI = axios.create({
-  baseURL: "https://pms-frontend-6ciz.onrender.com/api/admin",
+  baseURL: "https://pms-3vhoncykv-vedant2709s-projects.vercel.app/api/admin",
   withCredentials: true,
 });
 
