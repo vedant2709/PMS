@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const taskAPI = axios.create({
-  baseURL: "https://pms-frontend-6ciz.onrender.com/api/task",
+  baseURL: "https://pms-tisw.onrender.com/api/task",
   withCredentials: true,
 });
 

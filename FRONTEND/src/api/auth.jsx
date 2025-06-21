@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL: "https://pms-frontend-6ciz.onrender.com/api/auth",
+  baseURL: "https://pms-tisw.onrender.com/api/auth",
   withCredentials: true,
 });
 
