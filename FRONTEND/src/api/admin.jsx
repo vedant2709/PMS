@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const adminAPI = axios.create({
-  baseURL: "http://localhost:3000/api/admin",
+  baseURL: "https://pms-frontend-6ciz.onrender.com/api/admin",
   withCredentials: true,
 });
 

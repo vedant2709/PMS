@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const managerAPI = axios.create({
-  baseURL: "http://localhost:3000/",
+  baseURL: "https://pms-frontend-6ciz.onrender.com/",
   withCredentials: true,
 });
 

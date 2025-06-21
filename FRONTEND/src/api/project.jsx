@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const projectAPI = axios.create({
-  baseURL: "http://localhost:3000/api/projects",
+  baseURL: "https://pms-frontend-6ciz.onrender.com/api/projects",
   withCredentials: true,
 });
 
