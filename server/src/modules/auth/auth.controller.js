@@ -1,6 +1,7 @@
 import { loginSchema, registerSchema } from "./auth.schema.js";
 import {
   loginUser,
+  logoutUser,
   registerUser,
   rotateRefreshToken,
   verifyEmail,
@@ -64,5 +65,25 @@ export const refreshTokenController = catchAsync(async (req, res) => {
   res.json({
     status: "success",
     accessToken,
+  });
+});
+
+export const logoutController = catchAsync(async (req, res) => {
+  const refreshToken = req.cookies?.refreshToken;
+
+  if (refreshToken) {
+    await logoutUser(refreshToken);
+  }
+
+  // 🍪 Clear cookie
+  res.clearCookie("refreshToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+  });
+
+  res.status(200).json({
+    status: "success",
+    message: "Logged out successfully",
   });
 });

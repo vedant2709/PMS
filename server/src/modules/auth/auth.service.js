@@ -90,6 +90,15 @@ export const loginUser = async (email, password) => {
   // Access token
   const accessToken = signAccessToken({ userId: user._id.toString() });
 
+  // 🔒 Invalidate all previous sessions
+  await RefreshTokenModel.updateMany(
+    {
+      userId: user._id,
+      revoked: false,
+    },
+    { revoked: true }
+  );
+
   // Refresh token
   const refreshToken = generateRefreshToken();
   const refreshTokenHash = hashToken(refreshToken);
@@ -168,4 +177,15 @@ export const rotateRefreshToken = async (oldRefreshToken) => {
     accessToken,
     refreshToken: newRefreshToken,
   };
+};
+
+export const logoutUser = async (refreshToken) => {
+  const tokenHash = hashToken(refreshToken);
+
+  await RefreshTokenModel.updateOne(
+    {
+      tokenHash,
+    },
+    { revoked: true }
+  );
 };
