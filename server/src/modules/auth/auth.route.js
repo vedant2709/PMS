@@ -2,11 +2,13 @@ import { Router } from "express";
 import {
   disable2FAController,
   enable2FA,
+  forgotPasswordController,
   getCurrentUser,
   loginController,
   logoutController,
   refreshTokenController,
   registerController,
+  resetPasswordController,
   verifyEmailController,
   verifyEnable2FAController,
   verifyOtp,
@@ -25,5 +27,7 @@ router.post("/2fa/disable", protect, disable2FAController);
 router.post("/refresh-token", refreshTokenController);
 router.post("/logout", logoutController);
 router.get("/me", protect, getCurrentUser);
+router.post("/forgot-password", forgotPasswordController);
+router.post("/reset-password/:token", resetPasswordController);
 
 export default router;

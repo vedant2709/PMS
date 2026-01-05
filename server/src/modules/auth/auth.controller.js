@@ -1,10 +1,18 @@
-import { loginSchema, registerSchema, verifyOtpSchema } from "./auth.schema.js";
+import {
+  forgotPasswordSchema,
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+  verifyOtpSchema,
+} from "./auth.schema.js";
 import {
   disable2FA,
+  forgotPassword,
   loginUser,
   logoutUser,
   registerUser,
   requestEnable2FA,
+  resetPassword,
   rotateRefreshToken,
   verifyEmail,
   verifyEnable2FA,
@@ -167,3 +175,27 @@ export const getCurrentUser = async (req, res) => {
     },
   });
 };
+
+export const forgotPasswordController = catchAsync(async (req, res) => {
+  const { email } = forgotPasswordSchema.parse(req.body);
+
+  await forgotPassword(email);
+
+  res.status(200).json({
+    status: "success",
+    message: "If the email exists, a password reset link has been sent",
+  });
+});
+
+export const resetPasswordController = catchAsync(async (req, res) => {
+  console.log("Inside reset password");
+  const { token } = req.params;
+  const { password } = resetPasswordSchema.parse(req.body);
+
+  await resetPassword(token, password);
+
+  res.status(200).json({
+    status: "success",
+    message: "Password reset successful",
+  });
+});

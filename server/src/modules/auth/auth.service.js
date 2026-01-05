@@ -15,6 +15,7 @@ import {
 import RefreshTokenModel from "../../models/RefreshToken.model.js";
 import LoginOTPModel from "../../models/LoginOTP.model.js";
 import { generateOTP, hashOTP } from "../../services/otp.service.js";
+import PasswordResetTokenModel from "../../models/PasswordResetToken.model.js";
 
 export const registerUser = async (name, email, password) => {
   const passwordHash = await bcrypt.hash(password, 10);
@@ -361,4 +362,67 @@ export const logoutUser = async (refreshToken) => {
     },
     { revoked: true }
   );
+};
+
+export const forgotPassword = async (email) => {
+  const user = await UserModel.findOne({ email });
+
+  // ✅ Do NOT reveal whether user exists
+  if (!user) return;
+
+  if (!user.emailVerified) {
+    throw new AppError("Please verify your email first", 400);
+  }
+
+  // Remove old reset tokens
+  await PasswordResetTokenModel.deleteMany({ userId: user._id });
+
+  const resetToken = crypto.randomUUID();
+  const resetTokenHash = hashToken(resetToken);
+
+  await PasswordResetTokenModel.create({
+    userId: user._id,
+    tokenHash: resetTokenHash,
+    expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 mins
+  });
+
+  const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+
+  await sendEmail({
+    to: user.email,
+    subject: "Reset your password",
+    html: `
+      <p>You requested a password reset.</p>
+      <p>Click below to reset your password:</p>
+      <a href="${resetUrl}">Reset Password</a>
+      <p>This link expires in 15 minutes.</p>
+    `,
+  });
+};
+
+export const resetPassword = async (token, newPassword) => {
+  const tokenHash = hashToken(token);
+
+  const resetDoc = await PasswordResetTokenModel.findOne({
+    tokenHash,
+  });
+
+  if (!resetDoc || resetDoc.expiresAt < new Date()) {
+    throw new AppError("Invalid or expired reset token", 400);
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+
+  await UserModel.findByIdAndUpdate(resetDoc.userId, {
+    passwordHash,
+  });
+
+  // 🔒 Revoke all sessions
+  await RefreshTokenModel.updateMany(
+    { userId: resetDoc.userId, revoked: false },
+    { revoked: true }
+  );
+
+  // Cleanup token
+  await resetDoc.deleteOne();
 };
