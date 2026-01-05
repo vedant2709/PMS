@@ -7,6 +7,7 @@ import {
   verifyEmail,
 } from "./auth.service.js";
 import { catchAsync } from "../../utils/catchAsync.js";
+import UserModel from "../../models/User.model.js";
 
 export const registerController = catchAsync(async (req, res) => {
   const body = registerSchema.parse(req.body);
@@ -87,3 +88,16 @@ export const logoutController = catchAsync(async (req, res) => {
     message: "Logged out successfully",
   });
 });
+
+export const getCurrentUser = async (req, res) => {
+  const user = await UserModel.findById(req.user.id);
+
+  res.status(200).json({
+    status: "success",
+    userDetails: {
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
+  });
+};
