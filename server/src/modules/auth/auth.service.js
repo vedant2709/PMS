@@ -13,6 +13,8 @@ import {
   signAccessToken,
 } from "../../services/token.service.js";
 import RefreshTokenModel from "../../models/RefreshToken.model.js";
+import LoginOTPModel from "../../models/LoginOTP.model.js";
+import { generateOTP, hashOTP } from "../../services/otp.service.js";
 
 export const registerUser = async (name, email, password) => {
   const passwordHash = await bcrypt.hash(password, 10);
@@ -87,26 +89,59 @@ export const loginUser = async (email, password) => {
     throw new AppError("Invalid email or password", 401);
   }
 
-  // Access token
-  const accessToken = signAccessToken({ userId: user._id.toString() });
-
-  // 🔒 Invalidate all previous sessions
-  await RefreshTokenModel.updateMany(
-    {
+  // 🔐 2FA LOGIN FLOW
+  if (user.twoFactorEnabled) {
+    // ✅ Remove only LOGIN OTPs
+    await LoginOTPModel.deleteMany({
       userId: user._id,
-      revoked: false,
-    },
+      purpose: "LOGIN",
+    });
+
+    const otp = generateOTP();
+    const otpHash = hashOTP(otp);
+
+    await LoginOTPModel.create({
+      userId: user._id,
+      otpHash,
+      purpose: "LOGIN",
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    });
+
+    await sendEmail({
+      to: user.email,
+      subject: "Your login verification OTP",
+      html: `
+        <p>Your OTP code is:</p>
+        <h2>${otp}</h2>
+        <p>This code expires in 5 minutes.</p>
+      `,
+    });
+
+    return {
+      otpRequired: true,
+      userId: user._id.toString(),
+    };
+  }
+
+  // 🔓 NON-2FA LOGIN FLOW
+
+  const accessToken = signAccessToken({
+    userId: user._id.toString(),
+  });
+
+  // 🔒 Enforce single session
+  await RefreshTokenModel.updateMany(
+    { userId: user._id, revoked: false },
     { revoked: true }
   );
 
-  // Refresh token
   const refreshToken = generateRefreshToken();
   const refreshTokenHash = hashToken(refreshToken);
 
   await RefreshTokenModel.create({
     userId: user._id,
     tokenHash: refreshTokenHash,
-    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
   });
 
   return {
@@ -118,6 +153,144 @@ export const loginUser = async (email, password) => {
       role: user.role,
     },
   };
+};
+
+export const verifyLoginOTP = async (userId, otp) => {
+  const otpDoc = await LoginOTPModel.findOne({ userId });
+
+  if (!otpDoc) {
+    throw new AppError("OTP expired or invalid", 400);
+  }
+
+  if (otpDoc.expiresAt < new Date()) {
+    await otpDoc.deleteOne();
+    throw new AppError("OTP expired", 400);
+  }
+
+  if (otpDoc.attempts >= 5) {
+    await otpDoc.deleteOne();
+    throw new AppError("Too many invalid attempts", 429);
+  }
+
+  const otpHash = hashOTP(otp);
+
+  if (otpHash !== otpDoc.otpHash) {
+    otpDoc.attempts += 1;
+    await otpDoc.save();
+    throw new AppError("Invalid OTP", 400);
+  }
+
+  // ✅ OTP valid
+  await otpDoc.deleteOne();
+
+  // 🔒 Single-session enforcement
+  await RefreshTokenModel.updateMany(
+    { userId, revoked: false },
+    { revoked: true }
+  );
+
+  const accessToken = signAccessToken({ userId });
+  const refreshToken = generateRefreshToken();
+  const refreshTokenHash = hashToken(refreshToken);
+
+  await RefreshTokenModel.create({
+    userId,
+    tokenHash: refreshTokenHash,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  });
+
+  return {
+    accessToken,
+    refreshToken,
+  };
+};
+
+export const requestEnable2FA = async (userId) => {
+  const user = await UserModel.findById(userId);
+
+  if (!user) throw new AppError("User not found", 404);
+
+  if (!user.emailVerified) {
+    throw new AppError("Verify email before enabling 2FA", 400);
+  }
+
+  if (user.twoFactorEnabled) {
+    throw new AppError("2FA already enabled", 400);
+  }
+
+  // Remove old otps
+  await LoginOTPModel.deleteMany({
+    userId,
+    purpose: "ENABLE_2FA",
+  });
+
+  const otp = generateOTP();
+  const otpHash = hashOTP(otp);
+
+  await LoginOTPModel.create({
+    userId,
+    otpHash,
+    purpose: "ENABLE_2FA",
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+  });
+
+  await sendEmail({
+    to: user.email,
+    subject: "Confirm enabling 2FA",
+    html: `
+      <p>Use this OTP to enable 2FA:</p>
+      <h2>${otp}</h2>
+      <p>This code expires in 5 minutes.</p>
+    `,
+  });
+};
+
+export const verifyEnable2FA = async (userId, otp) => {
+  const otpDoc = await LoginOTPModel.findOne({
+    userId,
+    purpose: "ENABLE_2FA",
+  });
+
+  if (!otpDoc) {
+    throw new AppError("OTP expired or invalid", 400);
+  }
+
+  if (otpDoc.expiresAt < new Date()) {
+    await otpDoc.deleteOne();
+    throw new AppError("OTP expired", 400);
+  }
+
+  const otpHash = hashOTP(otp);
+
+  if (otpHash !== otpDoc.otpHash) {
+    throw new AppError("Invalid OTP", 400);
+  }
+
+  await UserModel.findByIdAndUpdate(userId, { twoFactorEnabled: true });
+
+  await otpDoc.deleteOne();
+};
+
+export const disable2FA = async (userId, password) => {
+  const user = await UserModel.findById(userId);
+
+  if (!user) throw new AppError("User not found", 404);
+
+  const valid = await bcrypt.compare(password, user.passwordHash);
+
+  if (!valid) {
+    throw new AppError("Invalid password", 401);
+  }
+
+  await UserModel.findByIdAndUpdate(userId, {
+    twoFactorEnabled: false,
+  });
+
+  // 🔒 Revoke all sessions
+  await RefreshTokenModel.updateMany(
+    { userId, revoked: false },
+    { revoked: true }
+  );
 };
 
 export const refreshAccessToken = async (refreshToken) => {
